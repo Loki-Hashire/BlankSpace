@@ -98,6 +98,10 @@ That's it — this workspace is set up to upload ("sync") your commit to GitHub 
 
 That link is your live site. Every commit updates it automatically within a few minutes. Submit this link on Moodle.
 
+### Optional: Connect the ad slots
+
+The site has 20 ad placements. They show labeled placeholders until an approved ad account is configured; placeholders do not generate revenue. For Google AdSense, apply for an account and get the site approved first. Then set `AD_CONFIG.client` in `data.js` to your publisher ID (`ca-pub-...`) and fill `AD_CONFIG.slotIds` with the 20 ad-unit IDs from your account. The site loads the AdSense script only for configured slots in the currently visible view. Ad serving also depends on the provider approving your site and meeting its requirements.
+
 ---
 
 ## Working as a team

@@ -16,6 +16,11 @@ const STARTUP = {
   pitch: "Who is your customer, what problem do they have, and why is your solution better than what they use today?"
 };
 
+const AD_CONFIG = {
+  client: "",
+  slotIds: new Array(20).fill("")
+};
+
 const LISTINGS = [
   { id: 1, name: "Sample listing A", category: "Category 1", description: "A short description of this item." },
   { id: 2, name: "Sample listing B", category: "Category 2", description: "A short description of this item." },
