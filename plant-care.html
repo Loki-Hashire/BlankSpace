@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2f4e9">
+  <meta name="description" content="A simple weekly planner for keeping houseplants happy.">
+  <title>Plant Week | Houseplant care planner</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #20352d;
+      --muted: #65756c;
+      --leaf: #32684c;
+      --leaf-dark: #244b38;
+      --paper: #fbfcf7;
+      --canvas: #f2f4e9;
+      --line: #dce3d6;
+      --sun: #f2b34e;
+      --coral: #d8755b;
+      --shadow: 0 14px 36px rgba(37, 61, 43, .08);
+      font-family: "Trebuchet MS", "Avenir Next", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--canvas);
+      background-image: radial-gradient(#dce5d2 0.8px, transparent 0.8px);
+      background-size: 18px 18px;
+      line-height: 1.45;
+    }
+    button, textarea { font: inherit; }
+    button:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--sun);
+      outline-offset: 3px;
+    }
+    .page { width: min(1440px, 100%); margin: 0 auto; padding: 28px clamp(16px, 4vw, 56px) 24px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 30px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-size: 1.1rem; font-weight: 800; }
+    .brand-mark { display: grid; width: 36px; aspect-ratio: 1; place-items: center; color: #fff; background: var(--leaf); border-radius: 50% 50% 50% 8px; transform: rotate(-8deg); }
+    .brand-mark svg { transform: rotate(8deg); }
+    .season-note { color: var(--muted); font-size: .85rem; }
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+    .kicker { margin: 0 0 8px; color: var(--leaf); font-size: .73rem; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
+    h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.2rem, 5vw, 3.5rem); font-weight: 500; letter-spacing: 0; line-height: 1; }
+    .intro-copy { max-width: 430px; margin: 12px 0 0; color: var(--muted); }
+    .week-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .week-label { min-width: 176px; text-align: center; font-weight: 700; }
+    .icon-button, .today-button { display: inline-grid; min-width: 42px; height: 42px; place-items: center; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+    .icon-button:hover, .today-button:hover { border-color: var(--leaf); color: var(--leaf); }
+    .today-button { display: inline-flex; padding: 0 14px; font-size: .85rem; font-weight: 700; }
+    .week-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 19px; margin-bottom: 14px; background: var(--leaf-dark); color: white; border-radius: 6px; }
+    .summary-title { font-family: Georgia, "Times New Roman", serif; font-size: 1.15rem; }
+    .summary-count { display: flex; align-items: center; gap: 9px; color: #e2eddd; font-size: .85rem; }
+    .progress-track { width: 105px; height: 6px; overflow: hidden; background: rgba(255,255,255,.2); border-radius: 5px; }
+    .progress-fill { width: 0; height: 100%; background: var(--sun); border-radius: inherit; transition: width .2s ease; }
+    .days-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+    .day-card { display: flex; min-height: 405px; flex-direction: column; padding: 14px 12px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); animation: arrive .35s both; }
+    .day-card:nth-child(2) { animation-delay: 25ms; }
+    .day-card:nth-child(3) { animation-delay: 50ms; }
+    .day-card:nth-child(4) { animation-delay: 75ms; }
+    .day-card:nth-child(5) { animation-delay: 100ms; }
+    .day-card:nth-child(6) { animation-delay: 125ms; }
+    .day-card:nth-child(7) { animation-delay: 150ms; }
+    .day-card.is-today { border-top: 3px solid var(--coral); padding-top: 12px; }
+    .day-head { min-height: 72px; border-bottom: 1px solid var(--line); }
+    .day-name { display: block; color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+    .day-date { display: inline-block; margin-top: 3px; font-family: Georgia, "Times New Roman", serif; font-size: 1.7rem; line-height: 1.1; }
+    .today-tag { display: block; margin-top: 3px; color: var(--coral); font-size: .65rem; font-weight: 800; text-transform: uppercase; }
+    .tasks { display: grid; gap: 9px; padding: 13px 0 12px; border-bottom: 1px solid var(--line); }
+    .task { display: flex; align-items: center; gap: 7px; color: #495c50; font-size: .76rem; cursor: pointer; }
+    .task input { width: 15px; height: 15px; flex: 0 0 auto; margin: 0; accent-color: var(--leaf); }
+    .notes-label { display: block; padding: 11px 0 5px; color: var(--muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; }
+    .day-notes { width: 100%; min-height: 103px; flex: 1; resize: vertical; padding: 9px; color: var(--ink); background: #f7f8f2; border: 1px solid transparent; border-radius: 4px; font-size: .8rem; line-height: 1.45; }
+    .day-notes::placeholder { color: #9ba69c; }
+    .day-notes:focus { background: white; border-color: #9bb9a0; }
+    .save-state { min-height: 17px; padding-top: 5px; color: var(--muted); font-size: .65rem; }
+    .bottom-note { display: flex; justify-content: space-between; gap: 16px; margin: 14px 2px 0; color: var(--muted); font-size: .77rem; }
+    .bottom-note strong { color: var(--leaf-dark); }
+    footer { padding-top: 22px; margin-top: 25px; border-top: 1px solid #d5ddcf; color: var(--muted); font-size: .75rem; text-align: center; }
+    @keyframes arrive { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 1050px) {
+      .days-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .day-card { min-height: 360px; }
+    }
+    @media (max-width: 680px) {
+      .page { padding-top: 18px; }
+      .topline { margin-bottom: 24px; }
+      .season-note { display: none; }
+      .intro { align-items: start; flex-direction: column; gap: 18px; }
+      .week-tools { width: 100%; justify-content: flex-start; }
+      .week-label { min-width: 0; flex: 1; text-align: left; }
+      .week-summary { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .days-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .day-card { min-height: 350px; padding: 12px 10px 10px; }
+      .day-head { min-height: 65px; }
+      .bottom-note { flex-direction: column; gap: 4px; }
+    }
+    @media (max-width: 360px) {
+      .days-grid { grid-template-columns: 1fr; }
+      .day-card { min-height: 300px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topline">
+      <a class="brand" href="plant-care.html" aria-label="Plant Week home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M19.5 4.5c-8.3 0-13 3.1-13 8.2 0 2.4 1.7 4.1 4.1 4.1 5.2 0 8.9-5.3 8.9-12.3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M4 20c2.4-4.9 6.2-7.5 11.3-9.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </span>
+        <span>plant week</span>
+      </a>
+      <span class="season-note">A little care, all week long</span>
+    </header>
+
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <p class="kicker">Your indoor garden, at a glance</p>
+        <h1 id="page-title">A week in bloom.</h1>
+        <p class="intro-copy">Keep watering, tending, and little plant reminders in one calm place.</p>
+      </div>
+      <div class="week-tools" aria-label="Choose a week">
+        <button class="icon-button" id="previous-week" type="button" aria-label="Previous week" title="Previous week">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <span class="week-label" id="week-label" aria-live="polite"></span>
+        <button class="icon-button" id="next-week" type="button" aria-label="Next week" title="Next week">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="today-button" id="current-week" type="button">This week</button>
+      </div>
+    </section>
+
+    <section aria-label="Weekly plant care plan">
+      <div class="week-summary">
+        <span class="summary-title" id="summary-title">Your plant-care rhythm</span>
+        <div class="summary-count" aria-live="polite">
+          <span id="completion-count">0 of 28 tasks done</span>
+          <span class="progress-track" aria-hidden="true"><span class="progress-fill" id="progress-fill"></span></span>
+        </div>
+      </div>
+      <div class="days-grid" id="days-grid"></div>
+      <div class="bottom-note">
+        <span><strong>Small reminder:</strong> check the soil before you water.</span>
+        <span>Your notes stay saved on this device.</span>
+      </div>
+    </section>
+
+    <footer>Student prototype for BSAD 281 at St. Francis Xavier University. Not a real company; all data is fictional.</footer>
+  </main>
+
+  <script>
+    const daysGrid = document.querySelector("#days-grid");
+    const weekLabel = document.querySelector("#week-label");
+    const summaryTitle = document.querySelector("#summary-title");
+    const completionCount = document.querySelector("#completion-count");
+    const progressFill = document.querySelector("#progress-fill");
+    const taskNames = ["Water", "Check soil", "Rotate pots", "Mist leaves"];
+    let weekStart = startOfWeek(new Date());
+
+    function startOfWeek(date) {
+      const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const daysSinceMonday = (start.getDay() + 6) % 7;
+      start.setDate(start.getDate() - daysSinceMonday);
+      return start;
+    }
+
+    function dateKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    }
+
+    function storageKey(date) {
+      return `plant-week-${dateKey(date)}`;
+    }
+
+    function readDay(date) {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey(date)) || "{}") || {};
+      } catch {
+        return {};
+      }
+    }
+
+    function writeDay(date, updates) {
+      try {
+        localStorage.setItem(storageKey(date), JSON.stringify({ ...readDay(date), ...updates }));
+      } catch {
+        // The planner remains usable if browser storage is unavailable.
+      }
+    }
+
+    function renderWeek() {
+      const todayKey = dateKey(new Date());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short" });
+      const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+      weekLabel.textContent = sameMonth
+        ? `${monthFormat.format(weekStart)} ${weekStart.getDate()} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
+        : `${monthFormat.format(weekStart)} ${weekStart.getDate()} – ${monthFormat.format(weekEnd)} ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`;
+      summaryTitle.textContent = `Your plant-care rhythm · ${monthFormat.format(weekStart)} ${weekStart.getDate()}`;
+      daysGrid.replaceChildren();
+
+      for (let index = 0; index < 7; index += 1) {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + index);
+        const key = dateKey(date);
+        const saved = readDay(date);
+        const card = document.createElement("article");
+        card.className = `day-card${key === todayKey ? " is-today" : ""}`;
+        const header = document.createElement("header");
+        header.className = "day-head";
+        const name = document.createElement("span");
+        name.className = "day-name";
+        name.textContent = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date);
+        const number = document.createElement("span");
+        number.className = "day-date";
+        number.textContent = date.getDate();
+        header.append(name, number);
+        if (key === todayKey) {
+          const today = document.createElement("span");
+          today.className = "today-tag";
+          today.textContent = "Today";
+          header.append(today);
+        }
+        card.append(header);
+
+        const tasks = document.createElement("div");
+        tasks.className = "tasks";
+        taskNames.forEach((taskName, taskIndex) => {
+          const label = document.createElement("label");
+          label.className = "task";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = Boolean(saved.tasks && saved.tasks[taskIndex]);
+          checkbox.setAttribute("aria-label", `${taskName} on ${name.textContent}`);
+          checkbox.addEventListener("change", () => {
+            const current = readDay(date);
+            const updatedTasks = Array.from({ length: taskNames.length }, (_, taskNumber) => taskNumber === taskIndex ? checkbox.checked : Boolean(current.tasks && current.tasks[taskNumber]));
+            writeDay(date, { tasks: updatedTasks });
+            updateProgress();
+          });
+          label.append(checkbox, document.createTextNode(taskName));
+          tasks.append(label);
+        });
+        card.append(tasks);
+
+        const notesLabel = document.createElement("label");
+        notesLabel.className = "notes-label";
+        notesLabel.textContent = "Plant notes";
+        const notes = document.createElement("textarea");
+        notes.className = "day-notes";
+        notes.value = saved.notes || "";
+        notes.placeholder = "Add a plant, task, or reminder…";
+        notes.setAttribute("aria-label", `Plant-care notes for ${name.textContent}`);
+        notesLabel.htmlFor = `notes-${key}`;
+        notes.id = `notes-${key}`;
+        notes.addEventListener("input", () => {
+          writeDay(date, { notes: notes.value });
+          status.textContent = "Saved";
+        });
+        const status = document.createElement("div");
+        status.className = "save-state";
+        status.setAttribute("aria-live", "polite");
+        status.textContent = notes.value ? "Saved" : "";
+        card.append(notesLabel, notes, status);
+        daysGrid.append(card);
+      }
+      updateProgress();
+    }
+
+    function updateProgress() {
+      let completed = 0;
+      for (let index = 0; index < 7; index += 1) {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + index);
+        completed += (readDay(date).tasks || []).filter(Boolean).length;
+      }
+      const total = taskNames.length * 7;
+      completionCount.textContent = `${completed} of ${total} tasks done`;
+      progressFill.style.width = `${(completed / total) * 100}%`;
+    }
+
+    document.querySelector("#previous-week").addEventListener("click", () => {
+      weekStart.setDate(weekStart.getDate() - 7);
+      renderWeek();
+    });
+    document.querySelector("#next-week").addEventListener("click", () => {
+      weekStart.setDate(weekStart.getDate() + 7);
+      renderWeek();
+    });
+    document.querySelector("#current-week").addEventListener("click", () => {
+      weekStart = startOfWeek(new Date());
+      renderWeek();
+    });
+
+    renderWeek();
+  </script>
+</body>
+</html>
