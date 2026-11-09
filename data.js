@@ -12,8 +12,8 @@
 
 const STARTUP = {
   name: "YourStartup",
-  tagline: "One sentence that says what your startup does.",
-  pitch: "Who is your customer, what problem do they have, and why is your solution better than what they use today?"
+  tagline: "One tool to rule them all",
+  pitch: "For aspiring authors, D&D players, and other creative minds in need of intuitive world-building tools."
 };
 
 const AD_CONFIG = {
