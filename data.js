@@ -11,9 +11,9 @@
 // ============================================================
 
 const STARTUP = {
-  name: "YourStartup",
+  name: "Blank Space",
   tagline: "One tool to rule them all",
-  pitch: "For aspiring authors, D&D players, and other creative minds in need of intuitive world-building tools."
+  pitch: "For creative minds, busy schedules, and anyone in need of intuitive organization tools that aren't hidden behind a paywall."
 };
 
 const AD_CONFIG = {
@@ -22,10 +22,10 @@ const AD_CONFIG = {
 };
 
 const LISTINGS = [
-  { id: 1, name: "Sample listing A", category: "Category 1", description: "A short description of this item." },
-  { id: 2, name: "Sample listing B", category: "Category 2", description: "A short description of this item." },
-  { id: 3, name: "Sample listing C", category: "Category 1", description: "A short description of this item." },
-  { id: 4, name: "Sample listing D", category: "Category 3", description: "A short description of this item." },
-  { id: 5, name: "Sample listing E", category: "Category 2", description: "A short description of this item." },
-  { id: 6, name: "Sample listing F", category: "Category 3", description: "A short description of this item." }
+  { id: 1, name: "Conspiracy Board", category: "Free", description: "Throw your fresh ideas against the wall to make sense of them." },
+  { id: 2, name: "Dual Layered Map", category: "Free", description: "You have your base map, and a second layer for specific points on your timeline." },
+  { id: 3, name: "Timeline Grid", category: "Free", description: "Order and organize consecutive and concurrent events." },
+  { id: 4, name: "Calendar Creator", category: "Free", description: "Use the Gregorian calendar for personal plans, or make your own." },
+  { id: 5, name: "General Archives", category: "Free", description: "For writing interconnected notes that reference each other." },
+  { id: 6, name: "Remove Ad", category: "$0.50/month", description: "Remove the one ad from the workspace." }
 ];

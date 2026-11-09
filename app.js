@@ -39,7 +39,7 @@
       { id: "idea", text: "Start with an idea", color: "#c85338", x: 0.06, y: 0.13 },
       { id: "test", text: "See if it works", color: "#45836a", x: 0.41, y: 0.43 },
       { id: "outcome", text: "Do something with it", color: "#2f5bea", x: 0.76, y: 0.13 },
-      { id: "arrange", text: "Arrange the pieces", color: "#b700ff", x: 0.41, y: 0.75 }
+      { id: "arrange", text: "Arrange the pieces", color: "#b700ff", x: 0.41, y: 0.09 }
     ],
     connections: [
       { from: "idea", to: "test", arrowheads: 1 },
@@ -382,7 +382,7 @@
       const deleteBar = document.createElement("button");
       deleteBar.className = "timeline-column__delete";
       deleteBar.type = "button";
-      deleteBar.textContent = "Delete bar";
+      deleteBar.textContent = "Delete";
       deleteBar.addEventListener("click", function () {
         if (bar.markers.length > 0 && !window.confirm("Are you sure you want to delete this alignment bar and its markers?")) return;
         timelineState.alignmentBars = timelineState.alignmentBars.filter(function (item) { return item.id !== bar.id; });
