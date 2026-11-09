@@ -77,7 +77,7 @@
          ======================================================= -->
     <section id="about" data-view hidden>
       <h1>About us</h1>
-      <p>A man got tired of trying to find a mind-map tool that wasn't locked behind a paywall, so he built one himself.</p>
+      <p>A man got tired of trying to find a world-building tool that wasn't locked behind a paywall, so he built one himself.</p>
       <p>A half-baked tool vibe-coded by Cameron for a school project.</p>
     </section>
 
@@ -93,6 +93,8 @@
       <div class="tool-switcher" role="tablist" aria-label="Organizational tools">
         <button class="tool-switcher__tab" id="tool-tab-buliten" type="button" role="tab"
           aria-controls="tool-panel-buliten" aria-selected="true">Buliten</button>
+        <button class="tool-switcher__tab" id="tool-tab-map" type="button" role="tab"
+          aria-controls="tool-panel-map" aria-selected="false" tabindex="-1">Map</button>
         <button class="tool-switcher__tab" id="tool-tab-timeline" type="button" role="tab"
           aria-controls="tool-panel-timeline" aria-selected="false" tabindex="-1">Timeline</button>
       </div>
@@ -128,6 +130,30 @@
             </defs>
           </svg>
           <div class="flow-nodes" id="flow-nodes"></div>
+        </div>
+      </section>
+
+      <section class="tool-panel" id="tool-panel-map" role="tabpanel"
+        aria-labelledby="tool-tab-map" tabindex="0" hidden>
+        <div class="map-toolbar" role="toolbar" aria-label="Map tools">
+          <button class="button" id="clear-map" type="button">Clear map</button>
+          <button class="button secondary" id="toggle-map-eraser" type="button" aria-pressed="false">Eraser</button>
+          <label class="map-control" for="map-color">
+            <span>Pen color</span>
+            <input id="map-color" type="color" value="#2f5bea">
+          </label>
+          <label class="map-control" for="map-page-select">
+            <span>Page</span>
+            <select id="map-page-select">
+              <option value="base">Base</option>
+            </select>
+          </label>
+        </div>
+        <div class="map-canvas-wrap" role="region" aria-label="Map drawing space">
+          <canvas id="map-canvas-base" class="map-canvas map-canvas--base"
+            aria-label="Base map drawing surface"></canvas>
+          <canvas id="map-canvas-overlay" class="map-canvas map-canvas--overlay"
+            aria-label="Overlay map drawing surface" hidden></canvas>
         </div>
       </section>
 

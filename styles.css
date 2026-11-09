@@ -215,6 +215,56 @@ h1 { line-height: 1.2; }
 .flow-connections { z-index: 1; overflow: visible; pointer-events: none; }
 .flow-connector { stroke: #5d6573; stroke-width: 2; }
 .flow-nodes { z-index: 2; pointer-events: none; }
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.map-toolbar .button { margin: 0; }
+.map-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.map-control input,
+.map-control select {
+  min-height: 38px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.map-control input { width: 42px; cursor: pointer; }
+.map-canvas-wrap {
+  position: relative;
+  height: min(68vh, 640px);
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: #f0f3ef;
+  background-image: linear-gradient(#dce3df 1px, transparent 1px), linear-gradient(90deg, #dce3df 1px, transparent 1px);
+  background-size: 24px 24px;
+  touch-action: none;
+}
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.map-canvas[hidden] { display: none; }
+.map-canvas--base { z-index: 1; }
+.map-canvas--overlay { z-index: 2; }
 .flow-node {
   position: absolute;
   width: 190px;

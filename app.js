@@ -138,6 +138,27 @@
   const timelineColumns = document.getElementById("timeline-columns");
   const timelineAlignmentBars = document.getElementById("timeline-alignment-bars");
   const timelineStatus = document.getElementById("timeline-status");
+  const baseMapCanvas = document.getElementById("map-canvas-base");
+  const overlayMapCanvas = document.getElementById("map-canvas-overlay");
+  const mapColorInput = document.getElementById("map-color");
+  const clearMapButton = document.getElementById("clear-map");
+  const mapEraserButton = document.getElementById("toggle-map-eraser");
+  const mapPageSelect = document.getElementById("map-page-select");
+  const mapCanvasWrap = document.querySelector(".map-canvas-wrap");
+  const baseMapContext = baseMapCanvas.getContext("2d");
+  const overlayMapContext = overlayMapCanvas.getContext("2d");
+  let isDrawingOnMap = false;
+  let lastMapPoint = null;
+  let drawingMapCanvas = null;
+  let drawingMapContext = null;
+  let drawingMapPage = null;
+  let drawingMapPointerId = null;
+  let isMapEraser = false;
+  let activeMapLayer = "base";
+  let savedMapPages = { base: null };
+  let mapCanvasScale = window.devicePixelRatio || 1;
+  let mapRestoreToken = 0;
+  let isRestoringMapPage = false;
   const defaultTimelineState = {
     columns: [
       { id: "phase-1", title: "Phase 1", markers: [] },
@@ -355,6 +376,7 @@
       label.addEventListener("input", function () {
         bar.label = label.value;
         saveTimelineState();
+        populateMapPageOptions();
       });
 
       const deleteBar = document.createElement("button");
@@ -398,6 +420,7 @@
       timelineAlignmentBars.appendChild(element);
     });
     updateTimelineStatus();
+    populateMapPageOptions();
   }
 
   document.getElementById("add-timeline-column").addEventListener("click", function () {
@@ -431,6 +454,233 @@
   });
 
   renderTimelineBoard();
+
+  function configureMapContext(context, color, eraser) {
+    if (!context) return;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.lineWidth = (eraser ? 18 : 3) * mapCanvasScale;
+    context.strokeStyle = eraser ? "rgba(0,0,0,1)" : color;
+    context.globalCompositeOperation = eraser ? "destination-out" : "source-over";
+  }
+
+  function resizeMapCanvas() {
+    const rect = mapCanvasWrap.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    if (isDrawingOnMap) endMapDraw();
+
+    const restorePending = isRestoringMapPage;
+    if (restorePending) cancelMapRestore();
+    mapCanvasScale = Math.max(window.devicePixelRatio || 1, 1);
+    const width = Math.round(rect.width * mapCanvasScale);
+    const height = Math.round(rect.height * mapCanvasScale);
+    if (!restorePending) saveMapPageState(activeMapLayer, getActiveMapCanvas());
+
+    [baseMapCanvas, overlayMapCanvas].forEach(function (canvas) {
+      if (canvas.width === width && canvas.height === height) return;
+
+      const previousCanvas = document.createElement("canvas");
+      if (canvas.width && canvas.height) {
+        previousCanvas.width = canvas.width;
+        previousCanvas.height = canvas.height;
+        previousCanvas.getContext("2d").drawImage(canvas, 0, 0);
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      if (previousCanvas.width && previousCanvas.height) {
+        canvas.getContext("2d").drawImage(previousCanvas, 0, 0, width, height);
+      }
+    });
+
+    configureMapContext(baseMapContext, mapColorInput.value, isMapEraser);
+    configureMapContext(overlayMapContext, mapColorInput.value, isMapEraser);
+    if (restorePending && activeMapLayer !== "base") {
+      restoreMapCanvasState(overlayMapCanvas, overlayMapContext, savedMapPages[activeMapLayer], activeMapLayer);
+    } else {
+      saveMapPageState(activeMapLayer, getActiveMapCanvas());
+    }
+  }
+
+  function getMapPointerPosition(event, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: Math.min(Math.max((event.clientX - rect.left) * canvas.width / rect.width, 0), canvas.width),
+      y: Math.min(Math.max((event.clientY - rect.top) * canvas.height / rect.height, 0), canvas.height)
+    };
+  }
+
+  function getActiveMapCanvas() {
+    return activeMapLayer === "base" ? baseMapCanvas : overlayMapCanvas;
+  }
+
+  function getActiveMapContext() {
+    return activeMapLayer === "base" ? baseMapContext : overlayMapContext;
+  }
+
+  function saveMapPageState(pageKey, canvas) {
+    const key = pageKey || activeMapLayer;
+    const targetCanvas = canvas || getActiveMapCanvas();
+    if (!targetCanvas) return;
+    savedMapPages[key] = targetCanvas.toDataURL();
+  }
+
+  function cancelMapRestore() {
+    mapRestoreToken += 1;
+    isRestoringMapPage = false;
+  }
+
+  function restoreMapCanvasState(canvas, context, dataUrl, pageKey) {
+    cancelMapRestore();
+    const restoreToken = mapRestoreToken;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    if (!dataUrl) return;
+
+    isRestoringMapPage = true;
+    const image = new Image();
+    image.onload = function () {
+      if (restoreToken !== mapRestoreToken || activeMapLayer !== pageKey) return;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      isRestoringMapPage = false;
+    };
+    image.onerror = function () {
+      if (restoreToken !== mapRestoreToken) return;
+      isRestoringMapPage = false;
+      console.error("Could not restore the selected map page.");
+    };
+    image.src = dataUrl;
+  }
+
+  function updateMapView() {
+    const isBaseSelected = activeMapLayer === "base";
+    baseMapCanvas.hidden = false;
+    overlayMapCanvas.hidden = isBaseSelected;
+    baseMapCanvas.style.pointerEvents = isBaseSelected ? "auto" : "none";
+    overlayMapCanvas.style.pointerEvents = isBaseSelected ? "none" : "auto";
+  }
+
+  function beginMapDraw(event) {
+    const canvas = event.currentTarget;
+    if (isRestoringMapPage || canvas !== getActiveMapCanvas()) return;
+
+    drawingMapCanvas = canvas;
+    drawingMapContext = getActiveMapContext();
+    drawingMapPage = activeMapLayer;
+    drawingMapPointerId = event.pointerId;
+    isDrawingOnMap = true;
+    lastMapPoint = getMapPointerPosition(event, canvas);
+    configureMapContext(drawingMapContext, mapColorInput.value, isMapEraser);
+    drawingMapContext.beginPath();
+    drawingMapContext.moveTo(lastMapPoint.x, lastMapPoint.y);
+    drawingMapContext.lineTo(lastMapPoint.x, lastMapPoint.y);
+    drawingMapContext.stroke();
+    canvas.setPointerCapture(event.pointerId);
+  }
+
+  function drawMapStroke(event) {
+    if (!isDrawingOnMap || event.pointerId !== drawingMapPointerId ||
+      !drawingMapCanvas || !drawingMapContext || !lastMapPoint) return;
+    const point = getMapPointerPosition(event, drawingMapCanvas);
+    configureMapContext(drawingMapContext, mapColorInput.value, isMapEraser);
+    drawingMapContext.beginPath();
+    drawingMapContext.moveTo(lastMapPoint.x, lastMapPoint.y);
+    drawingMapContext.lineTo(point.x, point.y);
+    drawingMapContext.stroke();
+    lastMapPoint = point;
+  }
+
+  function endMapDraw(event) {
+    if (!isDrawingOnMap) return;
+    if (event && event.pointerId !== drawingMapPointerId) return;
+    isDrawingOnMap = false;
+    lastMapPoint = null;
+    saveMapPageState(drawingMapPage, drawingMapCanvas);
+    drawingMapCanvas = null;
+    drawingMapContext = null;
+    drawingMapPage = null;
+    drawingMapPointerId = null;
+  }
+
+  function toggleMapEraser() {
+    isMapEraser = !isMapEraser;
+    mapEraserButton.setAttribute("aria-pressed", String(isMapEraser));
+    mapEraserButton.classList.toggle("secondary", !isMapEraser);
+    configureMapContext(baseMapContext, mapColorInput.value, isMapEraser);
+    configureMapContext(overlayMapContext, mapColorInput.value, isMapEraser);
+  }
+
+  function populateMapPageOptions() {
+    const pages = [{ value: "base", label: "Base" }].concat(
+      timelineState.alignmentBars.map(function (bar) {
+        return { value: bar.id, label: bar.label.trim() || "Untitled bar" };
+      })
+    );
+    mapPageSelect.replaceChildren();
+    pages.forEach(function (page) {
+      const option = document.createElement("option");
+      option.value = page.value;
+      option.textContent = page.label;
+      mapPageSelect.appendChild(option);
+    });
+
+    if (!pages.some(function (page) { return page.value === activeMapLayer; })) {
+      if (activeMapLayer !== "base") saveMapPageState();
+      cancelMapRestore();
+      activeMapLayer = "base";
+      updateMapView();
+      restoreMapCanvasState(overlayMapCanvas, overlayMapContext, null, "base");
+    }
+    mapPageSelect.value = activeMapLayer;
+  }
+
+  function switchMapLayer(value) {
+    if (isDrawingOnMap) endMapDraw();
+    saveMapPageState();
+    activeMapLayer = value;
+    updateMapView();
+    if (value !== "base") {
+      restoreMapCanvasState(overlayMapCanvas, overlayMapContext, savedMapPages[value], value);
+    } else {
+      restoreMapCanvasState(overlayMapCanvas, overlayMapContext, null, value);
+    }
+  }
+
+  clearMapButton.addEventListener("click", function () {
+    const targetCanvas = activeMapLayer === "base" ? baseMapCanvas : overlayMapCanvas;
+    const targetContext = activeMapLayer === "base" ? baseMapContext : overlayMapContext;
+    if (!targetCanvas || !targetContext) return;
+    cancelMapRestore();
+    targetContext.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    savedMapPages[activeMapLayer] = null;
+  });
+
+  mapEraserButton.addEventListener("click", toggleMapEraser);
+
+  mapColorInput.addEventListener("input", function () {
+    if (!isMapEraser) {
+      configureMapContext(baseMapContext, mapColorInput.value, false);
+      configureMapContext(overlayMapContext, mapColorInput.value, false);
+    }
+  });
+
+  mapPageSelect.addEventListener("change", function () {
+    switchMapLayer(mapPageSelect.value);
+  });
+
+  baseMapCanvas.addEventListener("pointerdown", beginMapDraw);
+  overlayMapCanvas.addEventListener("pointerdown", beginMapDraw);
+  baseMapCanvas.addEventListener("pointermove", drawMapStroke);
+  overlayMapCanvas.addEventListener("pointermove", drawMapStroke);
+  baseMapCanvas.addEventListener("pointerup", endMapDraw);
+  overlayMapCanvas.addEventListener("pointerup", endMapDraw);
+  baseMapCanvas.addEventListener("pointercancel", endMapDraw);
+  overlayMapCanvas.addEventListener("pointercancel", endMapDraw);
+  baseMapCanvas.addEventListener("lostpointercapture", endMapDraw);
+  overlayMapCanvas.addEventListener("lostpointercapture", endMapDraw);
+  resizeMapCanvas();
+  updateMapView();
+  populateMapPageOptions();
 
   function saveFlowState() {
     storage.set("flowDiagram", flowState);
@@ -737,6 +987,7 @@
       document.getElementById(item.getAttribute("aria-controls")).hidden = !selected;
     });
     if (tab.id === "tool-tab-buliten") renderFlowCanvas();
+    if (tab.id === "tool-tab-map") resizeMapCanvas();
   }
 
   toolTabs.forEach(function (tab, index) {
@@ -780,7 +1031,10 @@
       }
     });
 
-    if (current === "create") renderFlowCanvas();
+    if (current === "create") {
+      renderFlowCanvas();
+      resizeMapCanvas();
+    }
     initializeAds(document.getElementById(current));
     window.scrollTo(0, 0);
   }
@@ -851,7 +1105,10 @@
 
   searchBox.addEventListener("input", renderListings);
   window.addEventListener("resize", function () {
-    if (window.location.hash === "#create") renderFlowCanvas();
+    if (window.location.hash === "#create") {
+      renderFlowCanvas();
+      resizeMapCanvas();
+    }
   });
 
   // ----------------------------------------------------------
