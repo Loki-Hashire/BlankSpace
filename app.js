@@ -138,6 +138,21 @@
   const timelineColumns = document.getElementById("timeline-columns");
   const timelineAlignmentBars = document.getElementById("timeline-alignment-bars");
   const timelineStatus = document.getElementById("timeline-status");
+  const calendarMonthCount = document.getElementById("calendar-month-count");
+  const calendarMonthDayList = document.getElementById("calendar-month-day-list");
+  const calendarWeekLength = document.getElementById("calendar-week-length");
+  const calendarYearStart = document.getElementById("calendar-year-start");
+  const calendarMonthNames = document.getElementById("calendar-month-names");
+  const calendarDayNames = document.getElementById("calendar-day-names");
+  const calendarMonthSelect = document.getElementById("calendar-month-select");
+  const calendarGrid = document.getElementById("calendar-grid");
+  const calendarStatus = document.getElementById("calendar-status");
+  const calendarDayDetails = document.getElementById("calendar-day-details");
+  const calendarDayTitle = document.getElementById("calendar-day-title");
+  const calendarDaySummary = document.getElementById("calendar-day-summary");
+  const calendarDayNote = document.getElementById("calendar-day-note");
+  const calendarDayEvent = document.getElementById("calendar-day-event");
+  const calendarEventStatus = document.getElementById("calendar-event-status");
   const baseMapCanvas = document.getElementById("map-canvas-base");
   const overlayMapCanvas = document.getElementById("map-canvas-overlay");
   const mapColorInput = document.getElementById("map-color");
@@ -217,6 +232,352 @@
 
   let timelineState = loadTimelineState();
 
+  const defaultCalendarSettings = {
+    months: 12,
+    monthDays: Array(12).fill(30),
+    weekLength: 7,
+    yearStart: 0,
+    monthNames: "January\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember",
+    dayNames: "Sunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday"
+  };
+
+  function boundedCalendarNumber(value, minimum, maximum, fallback) {
+    return Number.isInteger(value) && value >= minimum && value <= maximum ? value : fallback;
+  }
+
+  function loadCalendarSettings() {
+    const saved = storage.get("calendarSettings", null);
+    if (!saved || typeof saved !== "object") {
+      return Object.assign({}, defaultCalendarSettings, { monthDays: defaultCalendarSettings.monthDays.slice() });
+    }
+    const months = boundedCalendarNumber(saved.months, 1, 24, defaultCalendarSettings.months);
+    const legacyDays = boundedCalendarNumber(saved.daysPerMonth, 1, 60, 30);
+    const savedMonthDays = Array.isArray(saved.monthDays) ? saved.monthDays : [];
+    const settings = {
+      months: months,
+      monthDays: Array.from({ length: months }, function (_, index) {
+        return boundedCalendarNumber(savedMonthDays[index], 1, 60, legacyDays);
+      }),
+      weekLength: boundedCalendarNumber(saved.weekLength, 1, 14, defaultCalendarSettings.weekLength),
+      yearStart: boundedCalendarNumber(saved.yearStart, 0, 13, defaultCalendarSettings.yearStart),
+      monthNames: typeof saved.monthNames === "string" ? saved.monthNames : defaultCalendarSettings.monthNames,
+      dayNames: typeof saved.dayNames === "string" ? saved.dayNames : defaultCalendarSettings.dayNames
+    };
+    if (settings.yearStart >= settings.weekLength) settings.yearStart = 0;
+    return settings;
+  }
+
+  let calendarSettings = loadCalendarSettings();
+  let selectedCalendarMonth = 0;
+  let selectedCalendarDay = null;
+  const calendarDayEntries = loadCalendarDayEntries();
+
+  function loadCalendarDayEntries() {
+    const saved = storage.get("calendarDayEntries", null);
+    if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
+    return Object.keys(saved).reduce(function (entries, key) {
+      const entry = saved[key];
+      if (!/^\d+:\d+$/.test(key) || !entry || typeof entry !== "object") return entries;
+      entries[key] = {
+        note: typeof entry.note === "string" ? entry.note.slice(0, 5000) : "",
+        eventId: typeof entry.eventId === "string" ? entry.eventId.slice(0, 100) : ""
+      };
+      return entries;
+    }, {});
+  }
+
+  function getCalendarDayEntry() {
+    if (!selectedCalendarDay) return null;
+    const key = selectedCalendarDay.month + ":" + selectedCalendarDay.day;
+    if (!calendarDayEntries[key]) calendarDayEntries[key] = { note: "", eventId: "" };
+    return calendarDayEntries[key];
+  }
+
+  function saveCalendarDayEntries() {
+    storage.set("calendarDayEntries", calendarDayEntries);
+  }
+
+  function hasCalendarDayDetails(month, day) {
+    const entry = calendarDayEntries[month + ":" + day];
+    return Boolean(entry && (entry.note.trim() || entry.eventId));
+  }
+
+  function updateCalendarDayMarker(month, day) {
+    if (month !== selectedCalendarMonth) return;
+    const dayButton = calendarGrid.querySelectorAll("button.calendar-day")[day - 1];
+    if (!dayButton) return;
+    const hasDetails = hasCalendarDayDetails(month, day);
+    dayButton.classList.toggle("calendar-day--has-details", hasDetails);
+    dayButton.setAttribute("aria-label", dayButton.dataset.baseLabel +
+      (hasDetails ? ", has notes or a linked event" : ""));
+  }
+
+  function getTimelineEvents() {
+    const events = [];
+    timelineState.columns.forEach(function (column) {
+      column.markers.forEach(function (marker) {
+        events.push({
+          id: marker.id,
+          label: (marker.text.trim() || "Untitled event") + " (" + column.title + ")"
+        });
+      });
+    });
+    timelineState.alignmentBars.forEach(function (bar) {
+      bar.markers.forEach(function (marker) {
+        const column = timelineState.columns.find(function (item) { return item.id === marker.columnId; });
+        const columnName = column ? column.title : "Timeline";
+        events.push({
+          id: marker.id,
+          label: (marker.text.trim() || "Untitled event") + " (" + bar.label + " · " + columnName + ")"
+        });
+      });
+    });
+    return events;
+  }
+
+  function updateCalendarEventOptions() {
+    if (!selectedCalendarDay) return;
+    const entry = getCalendarDayEntry();
+    const linkedEventId = entry.eventId;
+    const events = getTimelineEvents();
+    calendarDayEvent.replaceChildren();
+
+    const noEvent = document.createElement("option");
+    noEvent.value = "";
+    noEvent.textContent = "No event linked";
+    calendarDayEvent.appendChild(noEvent);
+    events.forEach(function (event) {
+      const option = document.createElement("option");
+      option.value = event.id;
+      option.textContent = event.label;
+      calendarDayEvent.appendChild(option);
+    });
+
+    const linkedEventExists = events.some(function (event) { return event.id === linkedEventId; });
+    if (linkedEventId && !linkedEventExists) {
+      const missingEvent = document.createElement("option");
+      missingEvent.value = linkedEventId;
+      missingEvent.textContent = "Event no longer in Timeline";
+      calendarDayEvent.appendChild(missingEvent);
+    }
+    calendarDayEvent.value = linkedEventId;
+    calendarEventStatus.textContent = linkedEventId && !linkedEventExists
+      ? "This linked event is no longer in the Timeline tool."
+      : "";
+  }
+
+  function calendarNames(value, count, fallbackPrefix) {
+    const names = value.split(/\r?\n/).map(function (name) { return name.trim(); }).filter(Boolean);
+    return Array.from({ length: count }, function (_, index) {
+      return names[index] || fallbackPrefix + " " + (index + 1);
+    });
+  }
+
+  function calendarDaysBeforeMonth(monthIndex) {
+    return calendarSettings.monthDays.slice(0, monthIndex).reduce(function (total, days) {
+      return total + days;
+    }, 0);
+  }
+
+  function renderCalendarMonthDaySettings() {
+    const monthNames = calendarNames(calendarSettings.monthNames, calendarSettings.months, "Month");
+    calendarMonthDayList.replaceChildren();
+    monthNames.forEach(function (name, index) {
+      const label = document.createElement("label");
+      const monthName = document.createElement("span");
+      const input = document.createElement("input");
+      label.className = "calendar-month-day-setting";
+      monthName.textContent = name;
+      input.type = "number";
+      input.min = "1";
+      input.max = "60";
+      input.step = "1";
+      input.value = String(calendarSettings.monthDays[index]);
+      input.setAttribute("aria-label", "Days in " + name);
+      input.addEventListener("change", function () {
+        const value = Number(input.value);
+        if (!Number.isInteger(value) || value < 1 || value > 60) {
+          input.value = String(calendarSettings.monthDays[index]);
+          calendarStatus.textContent = "Enter a whole number from 1 to 60.";
+          return;
+        }
+        calendarSettings.monthDays[index] = value;
+        saveCalendarSettings();
+      });
+      label.append(monthName, input);
+      calendarMonthDayList.appendChild(label);
+    });
+  }
+
+  function saveCalendarSettings() {
+    storage.set("calendarSettings", calendarSettings);
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const monthNames = calendarNames(calendarSettings.monthNames, calendarSettings.months, "Month");
+    const dayNames = calendarNames(calendarSettings.dayNames, calendarSettings.weekLength, "Day");
+    selectedCalendarMonth = Math.min(selectedCalendarMonth, calendarSettings.months - 1);
+    if (selectedCalendarDay && (selectedCalendarDay.month >= calendarSettings.months ||
+        selectedCalendarDay.day > calendarSettings.monthDays[selectedCalendarDay.month])) {
+      selectedCalendarDay = null;
+    }
+
+    calendarYearStart.replaceChildren();
+    dayNames.forEach(function (name, index) {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = name;
+      calendarYearStart.appendChild(option);
+    });
+    if (calendarSettings.yearStart >= calendarSettings.weekLength) calendarSettings.yearStart = 0;
+    calendarYearStart.value = String(calendarSettings.yearStart);
+
+    calendarMonthSelect.replaceChildren();
+    monthNames.forEach(function (name, index) {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = name;
+      calendarMonthSelect.appendChild(option);
+    });
+    calendarMonthSelect.value = String(selectedCalendarMonth);
+
+    calendarGrid.replaceChildren();
+    calendarGrid.style.setProperty("--calendar-week-length", String(calendarSettings.weekLength));
+    calendarGrid.setAttribute("aria-label", monthNames[selectedCalendarMonth]);
+    dayNames.forEach(function (name) {
+      const heading = document.createElement("div");
+      heading.className = "calendar-weekday";
+      heading.textContent = name;
+      calendarGrid.appendChild(heading);
+    });
+
+    const firstWeekday = (calendarSettings.yearStart +
+      calendarDaysBeforeMonth(selectedCalendarMonth)) % calendarSettings.weekLength;
+    for (let blank = 0; blank < firstWeekday; blank += 1) {
+      const emptyCell = document.createElement("div");
+      emptyCell.className = "calendar-day calendar-day--empty";
+      emptyCell.setAttribute("aria-hidden", "true");
+      calendarGrid.appendChild(emptyCell);
+    }
+    for (let day = 1; day <= calendarSettings.monthDays[selectedCalendarMonth]; day += 1) {
+      const weekdayIndex = (firstWeekday + day - 1) % calendarSettings.weekLength;
+      const dayButton = document.createElement("button");
+      const selected = selectedCalendarDay &&
+        selectedCalendarDay.month === selectedCalendarMonth && selectedCalendarDay.day === day;
+      const baseLabel = dayNames[weekdayIndex] + ", " + monthNames[selectedCalendarMonth] + " " + day;
+      const hasDetails = hasCalendarDayDetails(selectedCalendarMonth, day);
+      dayButton.type = "button";
+      dayButton.className = "calendar-day";
+      dayButton.textContent = String(day);
+      dayButton.dataset.baseLabel = baseLabel;
+      dayButton.setAttribute("aria-label", baseLabel +
+        (hasDetails ? ", has notes or a linked event" : ""));
+      dayButton.classList.toggle("calendar-day--has-details", hasDetails);
+      dayButton.setAttribute("aria-pressed", selected ? "true" : "false");
+      dayButton.addEventListener("click", function () {
+        selectedCalendarDay = { month: selectedCalendarMonth, day: day };
+        renderCalendar();
+        calendarGrid.querySelectorAll("button.calendar-day")[day - 1].focus();
+      });
+      calendarGrid.appendChild(dayButton);
+    }
+
+    const totalDays = calendarDaysBeforeMonth(calendarSettings.months);
+    calendarStatus.textContent = calendarSettings.months + " months · " + totalDays +
+      " days total";
+    if (!selectedCalendarDay) {
+      calendarDayDetails.hidden = true;
+      return;
+    }
+    const selectedDayOfYear = calendarDaysBeforeMonth(selectedCalendarDay.month) + selectedCalendarDay.day;
+    const selectedWeekday = (calendarSettings.yearStart + selectedDayOfYear - 1) %
+      calendarSettings.weekLength;
+    calendarDayTitle.textContent = dayNames[selectedWeekday] + ", " +
+      monthNames[selectedCalendarDay.month] + " " + selectedCalendarDay.day;
+    calendarDaySummary.textContent = "Day " + selectedDayOfYear + " of " + totalDays +
+      " · Week " + Math.ceil(selectedDayOfYear / calendarSettings.weekLength);
+    const entry = getCalendarDayEntry();
+    calendarDayNote.value = entry.note;
+    updateCalendarEventOptions();
+    calendarDayDetails.hidden = false;
+  }
+
+  calendarMonthCount.value = String(calendarSettings.months);
+  calendarWeekLength.value = String(calendarSettings.weekLength);
+  calendarMonthNames.value = calendarSettings.monthNames;
+  calendarDayNames.value = calendarSettings.dayNames;
+  renderCalendarMonthDaySettings();
+
+  [
+    { input: calendarMonthCount, key: "months", minimum: 1, maximum: 24 },
+    { input: calendarWeekLength, key: "weekLength", minimum: 1, maximum: 14 }
+  ].forEach(function (control) {
+    control.input.addEventListener("change", function () {
+      const value = Number(control.input.value);
+      if (!Number.isInteger(value) || value < control.minimum || value > control.maximum) {
+        control.input.value = String(calendarSettings[control.key]);
+        calendarStatus.textContent = "Enter a whole number from " + control.minimum + " to " +
+          control.maximum + ".";
+        return;
+      }
+      calendarSettings[control.key] = value;
+      if (control.key === "months") {
+        const previousMonthDays = calendarSettings.monthDays;
+        const addedMonthDays = previousMonthDays[previousMonthDays.length - 1] || 30;
+        calendarSettings.monthDays = Array.from({ length: value }, function (_, index) {
+          return previousMonthDays[index] || addedMonthDays;
+        });
+        renderCalendarMonthDaySettings();
+      }
+      saveCalendarSettings();
+    });
+  });
+  calendarYearStart.addEventListener("change", function () {
+    calendarSettings.yearStart = Number(calendarYearStart.value);
+    saveCalendarSettings();
+  });
+  calendarMonthNames.addEventListener("input", function () {
+    calendarSettings.monthNames = calendarMonthNames.value;
+    renderCalendarMonthDaySettings();
+    saveCalendarSettings();
+  });
+  calendarDayNames.addEventListener("input", function () {
+    calendarSettings.dayNames = calendarDayNames.value;
+    saveCalendarSettings();
+  });
+  calendarMonthSelect.addEventListener("change", function () {
+    selectedCalendarMonth = Number(calendarMonthSelect.value);
+    selectedCalendarDay = null;
+    renderCalendar();
+  });
+  document.getElementById("calendar-previous-month").addEventListener("click", function () {
+    selectedCalendarMonth = (selectedCalendarMonth - 1 + calendarSettings.months) % calendarSettings.months;
+    selectedCalendarDay = null;
+    renderCalendar();
+  });
+  document.getElementById("calendar-next-month").addEventListener("click", function () {
+    selectedCalendarMonth = (selectedCalendarMonth + 1) % calendarSettings.months;
+    selectedCalendarDay = null;
+    renderCalendar();
+  });
+  calendarDayNote.addEventListener("input", function () {
+    const entry = getCalendarDayEntry();
+    if (!entry) return;
+    entry.note = calendarDayNote.value;
+    saveCalendarDayEntries();
+    updateCalendarDayMarker(selectedCalendarDay.month, selectedCalendarDay.day);
+  });
+  calendarDayEvent.addEventListener("change", function () {
+    const entry = getCalendarDayEntry();
+    if (!entry) return;
+    entry.eventId = calendarDayEvent.value;
+    saveCalendarDayEntries();
+    calendarEventStatus.textContent = "";
+    updateCalendarDayMarker(selectedCalendarDay.month, selectedCalendarDay.day);
+  });
+  renderCalendar();
+
   function updateTimelineStatus() {
     const markerCount = timelineState.columns.reduce(function (total, column) {
       return total + column.markers.length;
@@ -230,6 +591,7 @@
   function saveTimelineState() {
     storage.set("timelineBoard", timelineState);
     updateTimelineStatus();
+    updateCalendarEventOptions();
   }
 
   function makeTimelineMarkerElement(marker, deleteMarker) {

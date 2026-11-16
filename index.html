@@ -92,6 +92,11 @@
         <h1>Create</h1>
       </div>
 
+      <div class="ad-slot ad-slot--banner" data-ad-index="1">
+        <p class="ad-slot__label">Advertisement</p>
+        <p class="ad-slot__placeholder">Banner ad space</p>
+      </div>
+
       <div class="tool-switcher" role="tablist" aria-label="Organizational tools">
         <button class="tool-switcher__tab" id="tool-tab-buliten" type="button" role="tab"
           aria-controls="tool-panel-buliten" aria-selected="true">Buliten</button>
@@ -99,6 +104,8 @@
           aria-controls="tool-panel-map" aria-selected="false" tabindex="-1">Map</button>
         <button class="tool-switcher__tab" id="tool-tab-timeline" type="button" role="tab"
           aria-controls="tool-panel-timeline" aria-selected="false" tabindex="-1">Timeline</button>
+        <button class="tool-switcher__tab" id="tool-tab-calendar" type="button" role="tab"
+          aria-controls="tool-panel-calendar" aria-selected="false" tabindex="-1">Calendar</button>
       </div>
 
       <section class="tool-panel" id="tool-panel-buliten" role="tabpanel"
@@ -172,6 +179,66 @@
             <div class="timeline-alignment-bars" id="timeline-alignment-bars"></div>
           </div>
         </div>
+      </section>
+
+      <section class="tool-panel" id="tool-panel-calendar" role="tabpanel"
+        aria-labelledby="tool-tab-calendar" tabindex="0" hidden>
+        <div class="calendar-settings">
+          <label class="calendar-setting" for="calendar-month-count">
+            <span>Months in a year</span>
+            <input id="calendar-month-count" type="number" min="1" max="99" step="1" value="12">
+          </label>
+          <label class="calendar-setting" for="calendar-week-length">
+            <span>Days in a week</span>
+            <input id="calendar-week-length" type="number" min="1" max="99" step="1" value="7">
+          </label>
+          <label class="calendar-setting" for="calendar-year-start">
+            <span>Weekday the year starts on</span>
+            <select id="calendar-year-start"></select>
+          </label>
+          <label class="calendar-setting calendar-setting--names" for="calendar-month-names">
+            <span>Month names <small>(one per line)</small></span>
+            <textarea id="calendar-month-names" rows="3"></textarea>
+          </label>
+          <label class="calendar-setting calendar-setting--names" for="calendar-day-names">
+            <span>Day names <small>(one per line)</small></span>
+            <textarea id="calendar-day-names" rows="3"></textarea>
+          </label>
+        </div>
+        <div class="calendar-month-day-settings" role="group" aria-labelledby="calendar-month-day-heading">
+          <p class="calendar-settings-heading" id="calendar-month-day-heading">Days in each month</p>
+          <div class="calendar-month-day-list" id="calendar-month-day-list"></div>
+        </div>
+        <p class="calendar-help">Names you leave blank use Month 1, Day 1, and so on. Settings are saved on this device.</p>
+        <div class="calendar-toolbar">
+          <button class="button secondary" id="calendar-previous-month" type="button" aria-label="Previous month">Previous</button>
+          <label class="calendar-month-picker" for="calendar-month-select">
+            <span>Showing</span>
+            <select id="calendar-month-select"></select>
+          </label>
+          <button class="button secondary" id="calendar-next-month" type="button" aria-label="Next month">Next</button>
+          <p class="calendar-status" id="calendar-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="calendar-grid-wrap">
+          <div class="calendar-grid" id="calendar-grid" role="group" aria-label="Calendar days"></div>
+        </div>
+        <section class="calendar-day-details" id="calendar-day-details" aria-live="polite" hidden>
+          <p class="eyebrow">Selected day</p>
+          <h2 id="calendar-day-title"></h2>
+          <p id="calendar-day-summary"></p>
+          <label class="calendar-day-field" for="calendar-day-note">
+            <span>Information for this day</span>
+            <textarea id="calendar-day-note" rows="4" maxlength="5000"
+              placeholder="Add notes, plans, or other details…"></textarea>
+          </label>
+          <label class="calendar-day-field" for="calendar-day-event">
+            <span>Connect a timeline event</span>
+            <select id="calendar-day-event">
+              <option value="">No event linked</option>
+            </select>
+          </label>
+          <p class="calendar-event-status" id="calendar-event-status" role="status" aria-live="polite"></p>
+        </section>
       </section>
     </section>
 
