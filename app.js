@@ -176,6 +176,11 @@
   const notesSortSelect = document.getElementById("notes-sort-select");
   const notesCreateButton = document.getElementById("notes-create");
   const notesDeleteButton = document.getElementById("notes-delete");
+  const workspaceExportButton = document.getElementById("workspace-export");
+  const workspaceImportButton = document.getElementById("workspace-import");
+  const workspaceImportFile = document.getElementById("workspace-import-file");
+  const workspaceEmptyButton = document.getElementById("workspace-empty");
+  const workspaceTransferStatus = document.getElementById("workspace-transfer-status");
   const baseMapCanvas = document.getElementById("sketch-canvas-base");
   const overlayMapCanvas = document.getElementById("sketch-canvas-overlay");
   const mapColorInput = document.getElementById("sketch-color");
@@ -1767,6 +1772,293 @@
       toolTabs[nextIndex].focus();
       selectToolTab(toolTabs[nextIndex]);
     });
+  });
+
+  const workspaceStorageKeys = [
+    "flowDiagram",
+    "timelineBoard",
+    "calendarSettings",
+    "calendarDayEntries",
+    "notesDocuments",
+    "mapPageImages"
+  ];
+
+  function isWorkspaceRecord(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function validateWorkspaceData(payload) {
+    if (!isWorkspaceRecord(payload) || payload.format !== "blankspace-create-workspace" ||
+      payload.version !== 1 || !isWorkspaceRecord(payload.data)) {
+      throw new Error("This is not a supported Blank Space workspace file.");
+    }
+
+    const data = payload.data;
+    const requiredKeys = workspaceStorageKeys;
+    if (requiredKeys.some(function (key) {
+      return !Object.prototype.hasOwnProperty.call(data, key);
+    })) {
+      throw new Error("The workspace file is missing required tool data.");
+    }
+
+    const flow = data.flowDiagram;
+    if (!isWorkspaceRecord(flow) || !Array.isArray(flow.nodes) || !Array.isArray(flow.connections) ||
+      [0, 1, 2].indexOf(flow.arrowheads) === -1) {
+      throw new Error("The Buliten data in this file is invalid.");
+    }
+    const flowNodeIds = new Set();
+    flow.nodes.forEach(function (node) {
+      if (!isWorkspaceRecord(node) || typeof node.id !== "string" || !node.id ||
+        typeof node.text !== "string" || !/^#[\da-f]{6}$/i.test(node.color) ||
+        !Number.isFinite(node.x) || !Number.isFinite(node.y) || flowNodeIds.has(node.id)) {
+        throw new Error("The Buliten data in this file is invalid.");
+      }
+      flowNodeIds.add(node.id);
+    });
+    flow.connections.forEach(function (connection) {
+      if (!isWorkspaceRecord(connection) || !flowNodeIds.has(connection.from) ||
+        !flowNodeIds.has(connection.to) || connection.from === connection.to ||
+        [0, 1, 2].indexOf(connection.arrowheads) === -1) {
+        throw new Error("The Buliten data in this file is invalid.");
+      }
+    });
+
+    const timeline = data.timelineBoard;
+    if (!isWorkspaceRecord(timeline) || !Array.isArray(timeline.columns) ||
+      !Array.isArray(timeline.alignmentBars)) {
+      throw new Error("The Timeline data in this file is invalid.");
+    }
+    const columnIds = new Set();
+    const markerIds = new Set();
+    function validateTimelineMarker(marker, columnId) {
+      if (!isWorkspaceRecord(marker) || typeof marker.id !== "string" || !marker.id ||
+        typeof marker.text !== "string" || !/^#[\da-f]{6}$/i.test(marker.color) ||
+        (columnId !== undefined && marker.columnId !== columnId) || markerIds.has(marker.id)) {
+        throw new Error("The Timeline data in this file is invalid.");
+      }
+      markerIds.add(marker.id);
+    }
+    timeline.columns.forEach(function (column) {
+      if (!isWorkspaceRecord(column) || typeof column.id !== "string" || !column.id ||
+        typeof column.title !== "string" || !Array.isArray(column.markers) || columnIds.has(column.id)) {
+        throw new Error("The Timeline data in this file is invalid.");
+      }
+      columnIds.add(column.id);
+      column.markers.forEach(function (marker) { validateTimelineMarker(marker); });
+    });
+    timeline.alignmentBars.forEach(function (bar) {
+      if (!isWorkspaceRecord(bar) || typeof bar.id !== "string" || !bar.id ||
+        typeof bar.label !== "string" || !Array.isArray(bar.markers)) {
+        throw new Error("The Timeline data in this file is invalid.");
+      }
+      bar.markers.forEach(function (marker) {
+        if (!columnIds.has(marker && marker.columnId)) {
+          throw new Error("The Timeline data in this file is invalid.");
+        }
+        validateTimelineMarker(marker, marker.columnId);
+      });
+    });
+
+    const calendar = data.calendarSettings;
+    if (!isWorkspaceRecord(calendar) || !Number.isInteger(calendar.months) ||
+      calendar.months < 1 || calendar.months > 24 || !Array.isArray(calendar.monthDays) ||
+      calendar.monthDays.length !== calendar.months ||
+      !calendar.monthDays.every(function (days) { return Number.isInteger(days) && days >= 1 && days <= 60; }) ||
+      !Number.isInteger(calendar.weekLength) || calendar.weekLength < 1 || calendar.weekLength > 14 ||
+      !Number.isInteger(calendar.yearStart) || calendar.yearStart < 0 ||
+      calendar.yearStart >= calendar.weekLength ||
+      typeof calendar.monthNames !== "string" || typeof calendar.dayNames !== "string") {
+      throw new Error("The Calendar settings in this file are invalid.");
+    }
+
+    const dayEntries = data.calendarDayEntries;
+    if (!isWorkspaceRecord(dayEntries)) {
+      throw new Error("The Calendar notes in this file are invalid.");
+    }
+    Object.keys(dayEntries).forEach(function (key) {
+      const entry = dayEntries[key];
+      const parts = /^(\d+):(\d+)$/.exec(key);
+      if (!parts || Number(parts[1]) > 98 || Number(parts[2]) < 1 || Number(parts[2]) > 60 ||
+        !isWorkspaceRecord(entry) || typeof entry.note !== "string" || entry.note.length > 5000 ||
+        typeof entry.eventId !== "string" || entry.eventId.length > 100) {
+        throw new Error("The Calendar notes in this file are invalid.");
+      }
+    });
+
+    if (!Array.isArray(data.notesDocuments)) {
+      throw new Error("The Notes data in this file is invalid.");
+    }
+    const noteIds = new Set();
+    const noteNames = new Set();
+    data.notesDocuments.forEach(function (note) {
+      if (!isWorkspaceRecord(note) || typeof note.id !== "string" || !note.id ||
+        typeof note.name !== "string" || !note.name.trim() || note.name.length > 80 ||
+        typeof note.content !== "string" || note.content.length > 50000 ||
+        !Number.isFinite(note.updatedAt) || noteIds.has(note.id) ||
+        noteNames.has(note.name.trim().toLocaleLowerCase())) {
+        throw new Error("The Notes data in this file is invalid.");
+      }
+      noteIds.add(note.id);
+      noteNames.add(note.name.trim().toLocaleLowerCase());
+    });
+
+    const mapPages = data.mapPageImages;
+    if (!isWorkspaceRecord(mapPages) || Object.keys(mapPages).some(function (key) {
+      const image = mapPages[key];
+      return (key !== "base" && !/^alignment-[a-z\d-]+$/i.test(key)) ||
+        (image !== null && (typeof image !== "string" ||
+          !/^data:image\/png;base64,[a-z\d+/]+=*$/i.test(image)));
+    })) {
+      throw new Error("The Sketch data in this file is invalid.");
+    }
+    return data;
+  }
+
+  function importWorkspaceData(data) {
+    let previousValues;
+    try {
+      previousValues = workspaceStorageKeys.map(function (key) {
+        return { key: key, value: localStorage.getItem(key) };
+      });
+    } catch (error) {
+      console.error("Could not read the current workspace before import.", error);
+      workspaceTransferStatus.textContent = "Could not access this device's saved workspace.";
+      return false;
+    }
+
+    const valuesToWrite = [
+      { key: "flowDiagram", value: data.flowDiagram },
+      { key: "timelineBoard", value: data.timelineBoard },
+      { key: "calendarSettings", value: data.calendarSettings },
+      { key: "calendarDayEntries", value: data.calendarDayEntries },
+      { key: "notesDocuments", value: data.notesDocuments },
+      { key: "mapPageImages", value: data.mapPageImages }
+    ];
+    try {
+      valuesToWrite.forEach(function (item) {
+        localStorage.setItem(item.key, JSON.stringify(item.value));
+      });
+      return true;
+    } catch (error) {
+      let restored = true;
+      previousValues.forEach(function (item) {
+        try {
+          if (item.value === null) localStorage.removeItem(item.key);
+          else localStorage.setItem(item.key, item.value);
+        } catch (restoreError) {
+          restored = false;
+          console.error("Could not restore a saved workspace item after import failed.", restoreError);
+        }
+      });
+      console.error("Could not save the imported workspace.", error);
+      workspaceTransferStatus.textContent = restored
+        ? "Import failed; your existing workspace was kept."
+        : "Import failed and this device could not fully restore its previous workspace.";
+      return false;
+    }
+  }
+
+  workspaceExportButton.addEventListener("click", function () {
+    workspaceTransferStatus.textContent = "";
+    if (isRestoringMapPage) {
+      workspaceTransferStatus.textContent = "Wait for the selected Sketch page to finish loading before exporting.";
+      return;
+    }
+    if (isDrawingOnMap) endMapDraw();
+    saveMapPageState();
+    const payload = {
+      format: "blankspace-create-workspace",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: {
+        flowDiagram: flowState,
+        timelineBoard: timelineState,
+        calendarSettings: calendarSettings,
+        calendarDayEntries: calendarDayEntries,
+        notesDocuments: notesDocuments,
+        mapPageImages: savedMapPages
+      }
+    };
+    try {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "blank-space-create-workspace.json";
+      link.click();
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      workspaceTransferStatus.textContent = "Your Create workspace has been downloaded.";
+    } catch (error) {
+      console.error("Could not export the Create workspace.", error);
+      workspaceTransferStatus.textContent = "Could not create the workspace file.";
+    }
+  });
+
+  workspaceImportButton.addEventListener("click", function () {
+    workspaceImportFile.click();
+  });
+  workspaceImportFile.addEventListener("change", async function () {
+    const file = workspaceImportFile.files[0];
+    workspaceImportFile.value = "";
+    if (!file) return;
+    workspaceTransferStatus.textContent = "";
+    if (file.size > 20 * 1024 * 1024) {
+      workspaceTransferStatus.textContent = "This workspace file is too large to import (20 MB maximum).";
+      return;
+    }
+    try {
+      const payload = JSON.parse(await file.text());
+      const data = validateWorkspaceData(payload);
+      if (!window.confirm("Importing this workspace will replace the Create page content on this device. Continue?")) {
+        workspaceTransferStatus.textContent = "Import cancelled.";
+        return;
+      }
+      if (!importWorkspaceData(data)) return;
+      workspaceTransferStatus.textContent = "Workspace imported. Reloading…";
+      window.location.reload();
+    } catch (error) {
+      console.error("Could not import the Create workspace.", error);
+      workspaceTransferStatus.textContent = error instanceof SyntaxError
+        ? "The selected file is not valid JSON."
+        : error.message || "Could not import this workspace file.";
+    }
+  });
+
+  workspaceEmptyButton.addEventListener("click", function () {
+    workspaceTransferStatus.textContent = "";
+    if (!window.confirm("Are you sure you want to empty your Create workspace?")) return;
+    if (!window.confirm("This action cannot be undone. Are you sure you want to reset the Create page?")) return;
+
+    let previousValues;
+    try {
+      previousValues = workspaceStorageKeys.map(function (key) {
+        return { key: key, value: localStorage.getItem(key) };
+      });
+      workspaceStorageKeys.forEach(function (key) {
+        localStorage.removeItem(key);
+      });
+    } catch (error) {
+      let restored = true;
+      if (previousValues) {
+        previousValues.forEach(function (item) {
+          try {
+            if (item.value === null) localStorage.removeItem(item.key);
+            else localStorage.setItem(item.key, item.value);
+          } catch (restoreError) {
+            restored = false;
+            console.error("Could not restore a saved workspace item after reset failed.", restoreError);
+          }
+        });
+      }
+      console.error("Could not reset the Create workspace.", error);
+      workspaceTransferStatus.textContent = restored
+        ? "Could not empty the canvas; your saved workspace was kept."
+        : "Reset failed and this device could not fully restore its previous workspace.";
+      return;
+    }
+
+    workspaceTransferStatus.textContent = "Canvas emptied. Reloading…";
+    window.location.reload();
   });
 
   // ----------------------------------------------------------

@@ -108,6 +108,8 @@
           aria-controls="tool-panel-calendar" aria-selected="false" tabindex="-1">Calendar</button>
         <button class="tool-switcher__tab" id="tool-tab-notes" type="button" role="tab"
           aria-controls="tool-panel-notes" aria-selected="false" tabindex="-1">Notes</button>
+        <button class="tool-switcher__tab" id="tool-tab-import-export" type="button" role="tab"
+          aria-controls="tool-panel-import-export" aria-selected="false" tabindex="-1">Import/Export</button>
       </div>
 
       <section class="tool-panel" id="tool-panel-buliten" role="tabpanel"
@@ -277,6 +279,24 @@
           </div>
           <p class="notes-empty" id="notes-empty">Create a document to get started.</p>
         </div>
+      </section>
+
+      <section class="tool-panel" id="tool-panel-import-export" role="tabpanel"
+        aria-labelledby="tool-tab-import-export" tabindex="0" hidden>
+        <h2>Move your workspace</h2>
+        <p>Export downloads your Buliten, Sketch, Timeline, Calendar, and Notes into one file. Import that file on another device to continue working there.</p>
+        <p>Import overwrites the current Create workspace on this device.</p>
+        <div class="workspace-transfer-actions">
+          <button class="button" id="workspace-export" type="button">Download workspace</button>
+          <button class="button secondary" id="workspace-import" type="button">Import workspace file</button>
+          <input id="workspace-import-file" type="file" accept=".json,application/json" hidden>
+        </div>
+        <h2>Reset workspace</h2>
+        <p>Brings the create page back to its initial state; a Blank Space.</p>
+        <div class="workspace-reset-actions">
+          <button class="button danger" id="workspace-empty" type="button">Empty Canvas</button>
+        </div>
+        <p class="workspace-transfer-status" id="workspace-transfer-status" role="status" aria-live="polite"></p>
       </section>
     </section>
 

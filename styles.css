@@ -184,6 +184,7 @@ h1 { line-height: 1.2; }
 .create-heading h1 { margin: 0; }
 .tool-switcher {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 18px;
   border-bottom: 1px solid var(--border);
@@ -312,6 +313,21 @@ h1 { line-height: 1.2; }
   font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
+}
+.workspace-transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.workspace-transfer-actions .button { margin: 0; }
+#tool-panel-import-export .workspace-transfer-actions + h2 { margin-top: 40px; }
+.workspace-reset-actions { margin-top: 20px; }
+.workspace-reset-actions .button { margin: 0; }
+#tool-panel-import-export h2 { margin-top: 0; }
+.workspace-transfer-status {
+  min-height: 1.5em;
+  margin: 12px 0 0;
+  color: var(--muted);
 }
 .flow-toolbar {
   display: flex;
