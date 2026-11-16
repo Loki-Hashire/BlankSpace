@@ -106,6 +106,8 @@
           aria-controls="tool-panel-timeline" aria-selected="false" tabindex="-1">Timeline</button>
         <button class="tool-switcher__tab" id="tool-tab-calendar" type="button" role="tab"
           aria-controls="tool-panel-calendar" aria-selected="false" tabindex="-1">Calendar</button>
+        <button class="tool-switcher__tab" id="tool-tab-notes" type="button" role="tab"
+          aria-controls="tool-panel-notes" aria-selected="false" tabindex="-1">Notes</button>
       </div>
 
       <section class="tool-panel" id="tool-panel-buliten" role="tabpanel"
@@ -157,6 +159,7 @@
               <option value="base">Base</option>
             </select>
           </label>
+          <p class="map-status" id="map-status" role="status" aria-live="polite"></p>
         </div>
         <div class="map-canvas-wrap" role="region" aria-label="Map drawing space">
           <canvas id="map-canvas-base" class="map-canvas map-canvas--base"
@@ -227,10 +230,10 @@
           <h2 id="calendar-day-title"></h2>
           <p id="calendar-day-summary"></p>
           <label class="calendar-day-field" for="calendar-day-note">
-            <span>Information for this day</span>
             <textarea id="calendar-day-note" rows="4" maxlength="5000"
-              placeholder="Add notes, plans, or other details…"></textarea>
+              placeholder="Add notes, plans, or other details. Use _Document name_ to link to a note."></textarea>
           </label>
+          <div class="calendar-note-shortcuts" id="calendar-note-links" aria-label="Linked notes" hidden></div>
           <label class="calendar-day-field" for="calendar-day-event">
             <span>Connect a timeline event</span>
             <select id="calendar-day-event">
@@ -239,6 +242,41 @@
           </label>
           <p class="calendar-event-status" id="calendar-event-status" role="status" aria-live="polite"></p>
         </section>
+      </section>
+
+      <section class="tool-panel" id="tool-panel-notes" role="tabpanel"
+        aria-labelledby="tool-tab-notes" tabindex="0" hidden>
+        <div class="notes-toolbar">
+          <button class="button" id="notes-create" type="button">New document</button>
+          <label class="notes-sort" for="notes-sort-select">
+            <span>Sort by</span>
+            <select id="notes-sort-select">
+              <option value="name">Name</option>
+              <option value="updated">Recently updated</option>
+            </select>
+          </label>
+          <p class="notes-status" id="notes-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="notes-layout">
+          <nav class="notes-list" id="notes-list" aria-label="Text documents"></nav>
+          <div class="notes-editor" id="notes-editor" hidden>
+            <div class="notes-document-toolbar">
+              <label class="notes-field" for="notes-title">
+                <span>Document name</span>
+                <input id="notes-title" type="text" maxlength="80" placeholder="Name this document">
+              </label>
+              <button class="button danger" id="notes-delete" type="button">Delete document</button>
+            </div>
+            <div class="notes-field">
+              <span id="notes-content-label">Text and shortcuts</span>
+              <p class="notes-help">Click this space to edit. Use _Document name_ for note shortcuts or _Month day_ (such as _January 1_) for calendar shortcuts.</p>
+              <div class="notes-content" id="notes-content" contenteditable="true" role="textbox"
+                aria-labelledby="notes-content-label" aria-multiline="true" tabindex="0"
+                data-placeholder="Write your notes here…"></div>
+            </div>
+          </div>
+          <p class="notes-empty" id="notes-empty">Create a document to get started.</p>
+        </div>
       </section>
     </section>
 

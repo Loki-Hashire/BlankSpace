@@ -151,14 +151,25 @@
   const calendarDayTitle = document.getElementById("calendar-day-title");
   const calendarDaySummary = document.getElementById("calendar-day-summary");
   const calendarDayNote = document.getElementById("calendar-day-note");
+  const calendarNoteLinks = document.getElementById("calendar-note-links");
   const calendarDayEvent = document.getElementById("calendar-day-event");
   const calendarEventStatus = document.getElementById("calendar-event-status");
+  const notesList = document.getElementById("notes-list");
+  const notesEditor = document.getElementById("notes-editor");
+  const notesTitle = document.getElementById("notes-title");
+  const notesContent = document.getElementById("notes-content");
+  const notesEmpty = document.getElementById("notes-empty");
+  const notesStatus = document.getElementById("notes-status");
+  const notesSortSelect = document.getElementById("notes-sort-select");
+  const notesCreateButton = document.getElementById("notes-create");
+  const notesDeleteButton = document.getElementById("notes-delete");
   const baseMapCanvas = document.getElementById("map-canvas-base");
   const overlayMapCanvas = document.getElementById("map-canvas-overlay");
   const mapColorInput = document.getElementById("map-color");
   const clearMapButton = document.getElementById("clear-map");
   const mapEraserButton = document.getElementById("toggle-map-eraser");
   const mapPageSelect = document.getElementById("map-page-select");
+  const mapStatus = document.getElementById("map-status");
   const mapCanvasWrap = document.querySelector(".map-canvas-wrap");
   const baseMapContext = baseMapCanvas.getContext("2d");
   const overlayMapContext = overlayMapCanvas.getContext("2d");
@@ -170,10 +181,35 @@
   let drawingMapPointerId = null;
   let isMapEraser = false;
   let activeMapLayer = "base";
-  let savedMapPages = { base: null };
+  function loadMapPages() {
+    try {
+      const saved = localStorage.getItem("mapPageImages");
+      if (saved === null) return { base: null };
+      const parsed = JSON.parse(saved);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Saved map data has an invalid format.");
+      }
+      const pages = { base: null };
+      Object.keys(parsed).forEach(function (key) {
+        const value = parsed[key];
+        if ((key === "base" || /^alignment-[a-z\d-]+$/i.test(key)) &&
+          (value === null || (typeof value === "string" && value.indexOf("data:image/png;base64,") === 0))) {
+          pages[key] = value;
+        }
+      });
+      return pages;
+    } catch (error) {
+      console.error("Could not load saved map data.", error);
+      mapStatus.textContent = "Saved map data could not be loaded.";
+      return { base: null };
+    }
+  }
+
+  let savedMapPages = loadMapPages();
   let mapCanvasScale = window.devicePixelRatio || 1;
   let mapRestoreToken = 0;
   let isRestoringMapPage = false;
+  let hasLoadedMapPages = false;
   const defaultTimelineState = {
     columns: [
       { id: "phase-1", title: "Phase 1", markers: [] },
@@ -232,6 +268,245 @@
 
   let timelineState = loadTimelineState();
 
+  function loadNotesDocuments() {
+    const saved = storage.get("notesDocuments", []);
+    if (!Array.isArray(saved)) return [];
+    return saved.filter(function (document) {
+      return document && typeof document.id === "string" && typeof document.name === "string" &&
+        typeof document.content === "string";
+    }).map(function (document) {
+      return {
+        id: document.id,
+        name: document.name.trim().slice(0, 80) || "Untitled document",
+        content: document.content.slice(0, 50000),
+        updatedAt: Number.isFinite(document.updatedAt) ? document.updatedAt : 0
+      };
+    });
+  }
+
+  let notesDocuments = loadNotesDocuments();
+  let selectedNoteId = notesDocuments.length ? notesDocuments[0].id : null;
+
+  function getSelectedNote() {
+    return notesDocuments.find(function (document) { return document.id === selectedNoteId; }) || null;
+  }
+
+  function saveNotesDocuments() {
+    storage.set("notesDocuments", notesDocuments);
+  }
+
+  function renderNotesSurface(note, editing) {
+    notesContent.contentEditable = editing ? "true" : "false";
+    notesContent.replaceChildren();
+    if (editing) {
+      notesContent.textContent = note.content;
+      return;
+    }
+    if (!note.content) {
+      const emptyPreview = document.createElement("p");
+      emptyPreview.className = "notes-content__empty";
+      emptyPreview.textContent = "Your document preview will appear here.";
+      notesContent.appendChild(emptyPreview);
+      return;
+    }
+
+    const availableDocuments = new Map(notesDocuments.map(function (item) {
+      return [item.name.toLocaleLowerCase(), item];
+    }));
+    note.content.split(/\r?\n/).forEach(function (line) {
+      const paragraph = document.createElement("p");
+      const shortcutPattern = /_([^_\r\n]+)_/g;
+      let cursor = 0;
+      let match;
+      while ((match = shortcutPattern.exec(line)) !== null) {
+        if (match.index > cursor) paragraph.appendChild(document.createTextNode(line.slice(cursor, match.index)));
+        const calendarDate = findCalendarReference(match[1]);
+        const target = availableDocuments.get(match[1].trim().toLocaleLowerCase());
+        if (calendarDate) {
+          const shortcut = document.createElement("button");
+          shortcut.type = "button";
+          shortcut.className = "notes-shortcut notes-shortcut--calendar";
+          shortcut.textContent = match[1].trim();
+          shortcut.setAttribute("aria-label", "Open calendar day: " + calendarDate.label);
+          shortcut.addEventListener("click", function () {
+            selectedCalendarMonth = calendarDate.month;
+            selectedCalendarDay = { month: calendarDate.month, day: calendarDate.day };
+            selectToolTab(document.getElementById("tool-tab-calendar"));
+          });
+          paragraph.appendChild(shortcut);
+        } else if (target) {
+          const shortcut = document.createElement("button");
+          shortcut.type = "button";
+          shortcut.className = "notes-shortcut";
+          shortcut.textContent = target.name;
+          shortcut.setAttribute("aria-label", "Open document: " + target.name);
+          shortcut.addEventListener("click", function () {
+            selectedNoteId = target.id;
+            renderNotes();
+            selectToolTab(document.getElementById("tool-tab-notes"));
+          });
+          paragraph.appendChild(shortcut);
+        } else {
+          paragraph.appendChild(document.createTextNode(match[0]));
+        }
+        cursor = match.index + match[0].length;
+      }
+      if (cursor < line.length) paragraph.appendChild(document.createTextNode(line.slice(cursor)));
+      if (!line) paragraph.appendChild(document.createElement("br"));
+      notesContent.appendChild(paragraph);
+    });
+  }
+
+  function renderNotesList() {
+    notesList.replaceChildren();
+    const sortBy = notesSortSelect.value;
+    const sortedDocuments = notesDocuments.slice().sort(function (first, second) {
+      if (sortBy === "updated" && first.updatedAt !== second.updatedAt) {
+        return second.updatedAt - first.updatedAt;
+      }
+      return first.name.localeCompare(second.name, undefined, { sensitivity: "base" });
+    });
+    sortedDocuments.forEach(function (note) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "notes-list__item";
+      item.textContent = note.name;
+      item.setAttribute("aria-current", note.id === selectedNoteId ? "true" : "false");
+      item.addEventListener("click", function () {
+        selectedNoteId = note.id;
+        notesStatus.textContent = "";
+        renderNotes();
+      });
+      notesList.appendChild(item);
+    });
+  }
+
+  function renderNotes() {
+    const document = getSelectedNote();
+    renderNotesList();
+    notesEmpty.hidden = Boolean(document);
+    notesEditor.hidden = !document;
+    if (!document) return;
+    notesTitle.value = document.name;
+    renderNotesSurface(document, false);
+  }
+
+  notesCreateButton.addEventListener("click", function () {
+    let name = "Untitled document";
+    let suffix = 2;
+    while (notesDocuments.some(function (item) {
+      return item.name.toLocaleLowerCase() === name.toLocaleLowerCase();
+    })) {
+      name = "Untitled document " + suffix;
+      suffix += 1;
+    }
+    const document = {
+      id: "note-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7),
+      name: name,
+      content: "",
+      updatedAt: Date.now()
+    };
+    notesDocuments.push(document);
+    selectedNoteId = document.id;
+    saveNotesDocuments();
+    notesStatus.textContent = "";
+    renderNotes();
+    notesTitle.focus();
+    notesTitle.select();
+  });
+
+  notesDeleteButton.addEventListener("click", function () {
+    const note = getSelectedNote();
+    if (!note) return;
+    const hasIncomingShortcut = notesDocuments.some(function (otherNote) {
+      if (otherNote.id === note.id) return false;
+      const shortcutPattern = /_([^_\r\n]+)_/g;
+      let match;
+      while ((match = shortcutPattern.exec(otherNote.content)) !== null) {
+        if (match[1].trim().toLocaleLowerCase() === note.name.toLocaleLowerCase()) return true;
+      }
+      return false;
+    });
+    if ((note.content.trim().length > 0 || hasIncomingShortcut) &&
+      !window.confirm("Are you sure you want to delete this?")) return;
+
+    notesDocuments = notesDocuments.filter(function (item) { return item.id !== note.id; });
+    selectedNoteId = notesDocuments.length ? notesDocuments[0].id : null;
+    saveNotesDocuments();
+    notesStatus.textContent = "";
+    renderNotes();
+  });
+
+  notesSortSelect.addEventListener("change", renderNotesList);
+  notesTitle.addEventListener("change", function () {
+    const document = getSelectedNote();
+    if (!document) return;
+    const name = notesTitle.value.trim();
+    if (!name) {
+      notesTitle.value = document.name;
+      notesStatus.textContent = "A document needs a name.";
+      return;
+    }
+    const duplicate = notesDocuments.some(function (item) {
+      return item.id !== document.id && item.name.toLocaleLowerCase() === name.toLocaleLowerCase();
+    });
+    if (duplicate) {
+      notesTitle.value = document.name;
+      notesStatus.textContent = "Each document must have a unique name for shortcuts to work.";
+      return;
+    }
+    document.name = name.slice(0, 80);
+    document.updatedAt = Date.now();
+    saveNotesDocuments();
+    notesStatus.textContent = "";
+    renderNotes();
+  });
+  notesContent.addEventListener("input", function () {
+    const document = getSelectedNote();
+    if (!document) return;
+    document.content = notesContent.textContent.slice(0, 50000);
+    document.updatedAt = Date.now();
+    saveNotesDocuments();
+    renderNotesList();
+  });
+  notesContent.addEventListener("focus", function () {
+    const document = getSelectedNote();
+    if (document) renderNotesSurface(document, true);
+  });
+  notesContent.addEventListener("blur", function () {
+    const document = getSelectedNote();
+    if (document) renderNotesSurface(document, false);
+  });
+  notesContent.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const lineBreak = document.createTextNode("\n");
+    range.insertNode(lineBreak);
+    range.setStartAfter(lineBreak);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    notesContent.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  notesContent.addEventListener("paste", function (event) {
+    event.preventDefault();
+    const pastedText = event.clipboardData.getData("text/plain");
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const pastedContent = document.createTextNode(pastedText);
+    range.insertNode(pastedContent);
+    range.setStartAfter(pastedContent);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    notesContent.dispatchEvent(new Event("input", { bubbles: true }));
+  });
   const defaultCalendarSettings = {
     months: 12,
     monthDays: Array(12).fill(30),
@@ -295,6 +570,27 @@
 
   function saveCalendarDayEntries() {
     storage.set("calendarDayEntries", calendarDayEntries);
+  }
+
+  function getCalendarDatesForEvent(eventId) {
+    const monthNames = calendarNames(calendarSettings.monthNames, calendarSettings.months, "Month");
+    const dates = [];
+    Object.keys(calendarDayEntries).forEach(function (key) {
+      const entry = calendarDayEntries[key];
+      if (entry.eventId !== eventId) return;
+      const parts = key.split(":").map(Number);
+      const month = parts[0];
+      const day = parts[1];
+      if (!Number.isInteger(month) || !Number.isInteger(day) ||
+        month < 0 || month >= calendarSettings.months ||
+        day < 1 || day > calendarSettings.monthDays[month]) return;
+      const monthName = monthNames[month];
+      const shortMonthName = monthName.length > 10 ? monthName.slice(0, 10) + "..." : monthName;
+      dates.push({ month: month, day: day, label: day + " " + shortMonthName, fullLabel: day + " " + monthName });
+    });
+    return dates.sort(function (first, second) {
+      return first.month - second.month || first.day - second.day;
+    });
   }
 
   function hasCalendarDayDetails(month, day) {
@@ -373,6 +669,53 @@
     });
   }
 
+  function findCalendarReference(reference) {
+    const normalizedReference = reference.trim().toLocaleLowerCase();
+    const monthNames = calendarNames(calendarSettings.monthNames, calendarSettings.months, "Month")
+      .map(function (name, index) { return { name: name, index: index }; })
+      .sort(function (first, second) { return second.name.length - first.name.length; });
+    for (let index = 0; index < monthNames.length; index += 1) {
+      const month = monthNames[index];
+      const normalizedMonth = month.name.toLocaleLowerCase();
+      if (!normalizedReference.startsWith(normalizedMonth)) continue;
+      const dayText = normalizedReference.slice(normalizedMonth.length).trim();
+      if (!/^\d+$/.test(dayText)) continue;
+      const day = Number(dayText);
+      if (day >= 1 && day <= calendarSettings.monthDays[month.index]) {
+        return { month: month.index, day: day, label: month.name + " " + day };
+      }
+    }
+    return null;
+  }
+
+  function renderCalendarNoteLinks(content) {
+    calendarNoteLinks.replaceChildren();
+    const notesByName = new Map(notesDocuments.map(function (note) {
+      return [note.name.toLocaleLowerCase(), note];
+    }));
+    const linkedNotes = new Set();
+    const shortcutPattern = /_([^_\r\n]+)_/g;
+    let match;
+    while ((match = shortcutPattern.exec(content)) !== null) {
+      const note = notesByName.get(match[1].trim().toLocaleLowerCase());
+      if (note && !linkedNotes.has(note.id)) {
+        linkedNotes.add(note.id);
+        const shortcut = document.createElement("button");
+        shortcut.type = "button";
+        shortcut.className = "notes-shortcut";
+        shortcut.textContent = note.name;
+        shortcut.setAttribute("aria-label", "Open note: " + note.name);
+        shortcut.addEventListener("click", function () {
+          selectedNoteId = note.id;
+          renderNotes();
+          selectToolTab(document.getElementById("tool-tab-notes"));
+        });
+        calendarNoteLinks.appendChild(shortcut);
+      }
+    }
+    calendarNoteLinks.hidden = linkedNotes.size === 0;
+  }
+
   function calendarDaysBeforeMonth(monthIndex) {
     return calendarSettings.monthDays.slice(0, monthIndex).reduce(function (total, days) {
       return total + days;
@@ -412,9 +755,11 @@
   function saveCalendarSettings() {
     storage.set("calendarSettings", calendarSettings);
     renderCalendar();
+    renderTimelineBoard();
   }
 
   function renderCalendar() {
+    calendarNoteLinks.hidden = true;
     const monthNames = calendarNames(calendarSettings.monthNames, calendarSettings.months, "Month");
     const dayNames = calendarNames(calendarSettings.dayNames, calendarSettings.weekLength, "Day");
     selectedCalendarMonth = Math.min(selectedCalendarMonth, calendarSettings.months - 1);
@@ -499,6 +844,7 @@
       " · Week " + Math.ceil(selectedDayOfYear / calendarSettings.weekLength);
     const entry = getCalendarDayEntry();
     calendarDayNote.value = entry.note;
+    renderCalendarNoteLinks(entry.note);
     updateCalendarEventOptions();
     calendarDayDetails.hidden = false;
   }
@@ -567,6 +913,7 @@
     entry.note = calendarDayNote.value;
     saveCalendarDayEntries();
     updateCalendarDayMarker(selectedCalendarDay.month, selectedCalendarDay.day);
+    renderCalendarNoteLinks(entry.note);
   });
   calendarDayEvent.addEventListener("change", function () {
     const entry = getCalendarDayEntry();
@@ -575,8 +922,10 @@
     saveCalendarDayEntries();
     calendarEventStatus.textContent = "";
     updateCalendarDayMarker(selectedCalendarDay.month, selectedCalendarDay.day);
+    renderTimelineBoard();
   });
   renderCalendar();
+  renderNotes();
 
   function updateTimelineStatus() {
     const markerCount = timelineState.columns.reduce(function (total, column) {
@@ -624,12 +973,24 @@
     });
     colorLabel.appendChild(colorInput);
 
+    const eventDates = document.createElement("span");
+    eventDates.className = "timeline-marker__date";
+    const dates = getCalendarDatesForEvent(marker.id);
+    eventDates.hidden = dates.length === 0;
+    eventDates.textContent = dates.map(function (date) { return date.label; }).join(", ");
+    if (dates.length) {
+      const fullDateLabels = dates.map(function (date) { return date.fullLabel; });
+      eventDates.title = fullDateLabels.join(", ");
+      eventDates.setAttribute("aria-label", "Calendar date" + (dates.length > 1 ? "s" : "") +
+        ": " + fullDateLabels.join(", "));
+    }
+
     const deleteButton = document.createElement("button");
     deleteButton.className = "timeline-marker__delete";
     deleteButton.type = "button";
     deleteButton.textContent = "Delete";
     deleteButton.addEventListener("click", deleteMarker);
-    controls.append(colorLabel, deleteButton);
+    controls.append(colorLabel, eventDates, deleteButton);
     markerElement.append(markerText, controls);
     return markerElement;
   }
@@ -836,7 +1197,7 @@
     mapCanvasScale = Math.max(window.devicePixelRatio || 1, 1);
     const width = Math.round(rect.width * mapCanvasScale);
     const height = Math.round(rect.height * mapCanvasScale);
-    if (!restorePending) saveMapPageState(activeMapLayer, getActiveMapCanvas());
+    if (!restorePending && hasLoadedMapPages) saveMapPageState(activeMapLayer, getActiveMapCanvas());
 
     [baseMapCanvas, overlayMapCanvas].forEach(function (canvas) {
       if (canvas.width === width && canvas.height === height) return;
@@ -857,7 +1218,10 @@
 
     configureMapContext(baseMapContext, mapColorInput.value, isMapEraser);
     configureMapContext(overlayMapContext, mapColorInput.value, isMapEraser);
-    if (restorePending && activeMapLayer !== "base") {
+    if (!hasLoadedMapPages) {
+      hasLoadedMapPages = true;
+      restoreMapCanvasState(baseMapCanvas, baseMapContext, savedMapPages.base, "base");
+    } else if (restorePending && activeMapLayer !== "base") {
       restoreMapCanvasState(overlayMapCanvas, overlayMapContext, savedMapPages[activeMapLayer], activeMapLayer);
     } else {
       saveMapPageState(activeMapLayer, getActiveMapCanvas());
@@ -880,11 +1244,30 @@
     return activeMapLayer === "base" ? baseMapContext : overlayMapContext;
   }
 
+  function persistMapPages() {
+    try {
+      localStorage.setItem("mapPageImages", JSON.stringify(savedMapPages));
+      mapStatus.textContent = "";
+      return true;
+    } catch (error) {
+      console.error("Could not save map data.", error);
+      mapStatus.textContent = "Map could not be saved. Device storage may be full or unavailable.";
+      return false;
+    }
+  }
+
   function saveMapPageState(pageKey, canvas) {
     const key = pageKey || activeMapLayer;
     const targetCanvas = canvas || getActiveMapCanvas();
     if (!targetCanvas) return;
-    savedMapPages[key] = targetCanvas.toDataURL();
+    if (isRestoringMapPage && key === activeMapLayer) return;
+    try {
+      savedMapPages[key] = targetCanvas.toDataURL();
+      persistMapPages();
+    } catch (error) {
+      console.error("Could not capture the current map page.", error);
+      mapStatus.textContent = "Map could not be saved.";
+    }
   }
 
   function cancelMapRestore() {
@@ -910,6 +1293,7 @@
       if (restoreToken !== mapRestoreToken) return;
       isRestoringMapPage = false;
       console.error("Could not restore the selected map page.");
+      mapStatus.textContent = "Could not restore the selected map page.";
     };
     image.src = dataUrl;
   }
@@ -1015,6 +1399,7 @@
     cancelMapRestore();
     targetContext.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
     savedMapPages[activeMapLayer] = null;
+    persistMapPages();
   });
 
   mapEraserButton.addEventListener("click", toggleMapEraser);
@@ -1350,6 +1735,7 @@
     });
     if (tab.id === "tool-tab-buliten") renderFlowCanvas();
     if (tab.id === "tool-tab-map") resizeMapCanvas();
+    if (tab.id === "tool-tab-calendar") renderCalendar();
   }
 
   toolTabs.forEach(function (tab, index) {
