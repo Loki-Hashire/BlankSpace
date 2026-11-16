@@ -31,6 +31,19 @@
     }
   };
 
+  const themeToggle = document.getElementById("theme-toggle");
+
+  function setNightMode(enabled, savePreference) {
+    document.body.classList.toggle("night-mode", enabled);
+    themeToggle.setAttribute("aria-pressed", String(enabled));
+    if (savePreference) storage.set("nightMode", enabled);
+  }
+
+  setNightMode(storage.get("nightMode", false) === true, false);
+  themeToggle.addEventListener("click", function () {
+    setNightMode(themeToggle.getAttribute("aria-pressed") !== "true", true);
+  });
+
   let savedIds = storage.get("savedIds", []);
 
   const defaultFlowState = {
@@ -163,14 +176,14 @@
   const notesSortSelect = document.getElementById("notes-sort-select");
   const notesCreateButton = document.getElementById("notes-create");
   const notesDeleteButton = document.getElementById("notes-delete");
-  const baseMapCanvas = document.getElementById("map-canvas-base");
-  const overlayMapCanvas = document.getElementById("map-canvas-overlay");
-  const mapColorInput = document.getElementById("map-color");
-  const clearMapButton = document.getElementById("clear-map");
-  const mapEraserButton = document.getElementById("toggle-map-eraser");
-  const mapPageSelect = document.getElementById("map-page-select");
-  const mapStatus = document.getElementById("map-status");
-  const mapCanvasWrap = document.querySelector(".map-canvas-wrap");
+  const baseMapCanvas = document.getElementById("sketch-canvas-base");
+  const overlayMapCanvas = document.getElementById("sketch-canvas-overlay");
+  const mapColorInput = document.getElementById("sketch-color");
+  const clearMapButton = document.getElementById("clear-sketch");
+  const mapEraserButton = document.getElementById("toggle-sketch-eraser");
+  const mapPageSelect = document.getElementById("sketch-page-select");
+  const mapStatus = document.getElementById("sketch-status");
+  const mapCanvasWrap = document.querySelector(".sketch-canvas-wrap");
   const baseMapContext = baseMapCanvas.getContext("2d");
   const overlayMapContext = overlayMapCanvas.getContext("2d");
   let isDrawingOnMap = false;
@@ -1734,7 +1747,7 @@
       document.getElementById(item.getAttribute("aria-controls")).hidden = !selected;
     });
     if (tab.id === "tool-tab-buliten") renderFlowCanvas();
-    if (tab.id === "tool-tab-map") resizeMapCanvas();
+    if (tab.id === "tool-tab-sketch") resizeMapCanvas();
     if (tab.id === "tool-tab-calendar") renderCalendar();
   }
 

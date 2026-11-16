@@ -23,9 +23,9 @@ const AD_CONFIG = {
 
 const LISTINGS = [
   { id: 1, name: "Conspiracy Board", category: "Free", description: "Throw your fresh ideas against the wall to make sense of them." },
-  { id: 2, name: "Dual Layered Map", category: "Free", description: "You have your base map, and a second layer for specific points on your timeline." },
+  { id: 2, name: "Dual Layered Sketch", category: "Free", description: "You have your base sketch, and secondary layers for specific points on your timeline." },
   { id: 3, name: "Timeline Grid", category: "Free", description: "Order and organize consecutive and concurrent events." },
   { id: 4, name: "Calendar Creator", category: "Free", description: "Use the Gregorian calendar for personal plans, or make your own." },
   { id: 5, name: "General Archives", category: "Free", description: "For writing interconnected notes that reference each other." },
-  { id: 6, name: "Remove Ad", category: "$0.50/month", description: "Remove the one ad from the workspace." }
+  { id: 6, name: "Remove Ad", category: "$0.50/month", description: "Remove the one ad from the workspace (this is a joke)." }
 ];

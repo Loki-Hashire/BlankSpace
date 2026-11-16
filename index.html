@@ -20,6 +20,7 @@
       <a href="#explore">Explore</a>
       <a href="#about">About</a>
       <a href="#create">Create</a>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-pressed="false">Night mode</button>
     </nav>
   </header>
 
@@ -60,8 +61,7 @@
          ======================================================= -->
     <section id="explore" data-view hidden>
       <h1>Explore</h1>
-      <p class="muted">The only fake part is the existence of an Ad. Everything else is [either real, or will be] real.</p>
-
+      <p class="muted">The only fake part is the existence of an Ad, everything else is real.</p>
       <label class="search">
         <span>Search</span>
         <input type="search" id="search-box" placeholder="Type to filter…">
@@ -100,8 +100,8 @@
       <div class="tool-switcher" role="tablist" aria-label="Organizational tools">
         <button class="tool-switcher__tab" id="tool-tab-buliten" type="button" role="tab"
           aria-controls="tool-panel-buliten" aria-selected="true">Buliten</button>
-        <button class="tool-switcher__tab" id="tool-tab-map" type="button" role="tab"
-          aria-controls="tool-panel-map" aria-selected="false" tabindex="-1">Map</button>
+        <button class="tool-switcher__tab" id="tool-tab-sketch" type="button" role="tab"
+          aria-controls="tool-panel-sketch" aria-selected="false" tabindex="-1">Sketch</button>
         <button class="tool-switcher__tab" id="tool-tab-timeline" type="button" role="tab"
           aria-controls="tool-panel-timeline" aria-selected="false" tabindex="-1">Timeline</button>
         <button class="tool-switcher__tab" id="tool-tab-calendar" type="button" role="tab"
@@ -144,28 +144,28 @@
         </div>
       </section>
 
-      <section class="tool-panel" id="tool-panel-map" role="tabpanel"
-        aria-labelledby="tool-tab-map" tabindex="0" hidden>
-        <div class="map-toolbar" role="toolbar" aria-label="Map tools">
-          <button class="button" id="clear-map" type="button">Clear map</button>
-          <button class="button secondary" id="toggle-map-eraser" type="button" aria-pressed="false">Eraser</button>
-          <label class="map-control" for="map-color">
+      <section class="tool-panel" id="tool-panel-sketch" role="tabpanel"
+        aria-labelledby="tool-tab-sketch" tabindex="0" hidden>
+        <div class="sketch-toolbar" role="toolbar" aria-label="Sketch tools">
+          <button class="button" id="clear-sketch" type="button">Clear sketch</button>
+          <button class="button secondary" id="toggle-sketch-eraser" type="button" aria-pressed="false">Eraser</button>
+          <label class="sketch-control" for="sketch-color">
             <span>Pen color</span>
-            <input id="map-color" type="color" value="#2f5bea">
+            <input id="sketch-color" type="color" value="#2f5bea">
           </label>
-          <label class="map-control" for="map-page-select">
+          <label class="sketch-control" for="sketch-page-select">
             <span>Page</span>
-            <select id="map-page-select">
+            <select id="sketch-page-select">
               <option value="base">Base</option>
             </select>
           </label>
-          <p class="map-status" id="map-status" role="status" aria-live="polite"></p>
+          <p class="sketch-status" id="sketch-status" role="status" aria-live="polite"></p>
         </div>
-        <div class="map-canvas-wrap" role="region" aria-label="Map drawing space">
-          <canvas id="map-canvas-base" class="map-canvas map-canvas--base"
-            aria-label="Base map drawing surface"></canvas>
-          <canvas id="map-canvas-overlay" class="map-canvas map-canvas--overlay"
-            aria-label="Overlay map drawing surface" hidden></canvas>
+        <div class="sketch-canvas-wrap" role="region" aria-label="Sketch drawing space">
+          <canvas id="sketch-canvas-base" class="sketch-canvas sketch-canvas--base"
+            aria-label="Base sketch drawing surface"></canvas>
+          <canvas id="sketch-canvas-overlay" class="sketch-canvas sketch-canvas--overlay"
+            aria-label="Overlay sketch drawing surface" hidden></canvas>
         </div>
       </section>
 
